@@ -68,6 +68,16 @@ def rnn_step_backward(dnext_h, cache):
     # of the output value from tanh.                                             #
     ##############################################################################
     pass
+    x, Wx, prev_h, Wh,  forward = cache
+
+    # Backprop step 2:
+    # dforward N*H
+    dforward = (1 - np.tanh(forward)**2) * dnext_h
+    db = np.sum(dforward, axis=0)
+    dx = np.dot(dforward,Wx.T)
+    dWx = np.dot(x.T, dforward)
+    dprev_h = np.dot(dforward, Wh.T)
+    dWh = np.dot(prev_h.T, dforward)
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -99,6 +109,20 @@ def rnn_forward(x, h0, Wx, Wh, b):
     # above. You can use a for loop to help compute the forward pass.            #
     ##############################################################################
     pass
+    N,T,D = x.shape
+    H = h0.shape[1]
+
+    # Initialize cache
+    cache = []
+
+    h = np.zeros((N,T,H))
+    for t in range(T):
+        if t==0:
+            prev_h = h0
+        else:
+            prev_h = h[:,t-1,:]
+        h[:,t,:],cache_next = rnn_step_forward(x[:,t,:], prev_h, Wx, Wh, b)
+        cache.append(cache_next)
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -131,6 +155,54 @@ def rnn_backward(dh, cache):
     # defined above. You can use a for loop to help compute the backward pass.   #
     ##############################################################################
     pass
+    # T = len(cache)
+    # # import pdb;pdb.set_trace()
+    # dx_T,dprev_h,dWx,dWh,db = rnn_step_backward(dh[:,-1,:],cache[-1])
+
+    # N,D = dx_T.shape
+    # dx = np.zeros((N,T,D))
+    # dx[:,-1,:] = dx_T
+
+    # for t in list(range(T-1))[::-1]:
+    #     print(t)
+    #     dh_t = dprev_h
+    #     cache_t=cache[t]
+    #     dx_t,dprev_h,dWx_t,dWh_t,db_t = rnn_step_backward(dh_t,cache_t)
+    #     dx[:,t,:] = dx_t
+    #     dWx = dWx + dWx_t
+    #     dWh = dWh + dWh_t
+    #     db = db + db_t
+    # dh0 = dprev_h
+    ######################################
+    # Backprop into the rnn.
+
+    # Dimensions
+    N, T, H = dh.shape
+    D = cache[0][0].shape[1]
+
+    # Initialize dx,dh0,dWx,dWh,db
+    dx = np.zeros((T, N, D))
+    dh0 = np.zeros((N, H))
+    db = np.zeros((H))
+    dWh = np.zeros((H, H))
+    dWx = np.zeros((D, H))
+
+    # On transpose dh
+    dh = dh.transpose(1, 0, 2)
+    dh_prev = np.zeros((N, H))
+
+    for t in reversed(range(T)):
+        dh_current = dh[t] + dh_prev
+        dx_t, dh_prev, dWx_t, dWh_t, db_t = rnn_step_backward(
+            dh_current, cache[t])
+        dx[t] += dx_t
+        dh0 = dh_prev
+        dWx += dWx_t
+        dWh += dWh_t
+        db += db_t
+
+    dx = dx.transpose(1, 0, 2)
+    return dx, dh0, dWx, dWh, db
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
