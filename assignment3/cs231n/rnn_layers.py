@@ -313,6 +313,42 @@ def lstm_step_forward(x, prev_h, prev_c, Wx, Wh, b):
     # You may want to use the numerically stable sigmoid implementation above.  #
     #############################################################################
     pass
+    # H = prev_h.shape[1]
+    # t  = np.dot(x, Wx)+np.dot(prev_h, Wh)+b
+    # i = sigmoid(t[:, 0:H])
+    # f = sigmoid(t[:, H:2*H])
+    # o = sigmoid(t[:, 2*H:3*H])
+    # g = np.tanh(t[:, 3*H:4*H])
+    # next_c = f*prev_c+i*g
+    # next_h = o* np.tanh(next_c)
+    # cache = x, prev_h, prev_c, Wx, Wh, b
+
+    # Get the size
+    H = prev_h.shape[1]
+
+    # 1 First compute the intermediate vector
+    a = np.dot(x, Wx) + np.dot(prev_h, Wh) + b
+
+    # 2 Compute the gates
+    ai = a[:, :H]
+    af = a[:, H:2 * H]
+    ao = a[:, 2 * H:3 * H]
+    ag = a[:, 3 * H:4 * H]
+
+    # 3 Compute the gate
+    i = sigmoid(ai)
+    f = sigmoid(af)
+    o = sigmoid(ao)
+    g = np.tanh(ag)
+
+    # 4 Compute the next cell state
+    next_c = f * prev_c + i * g
+
+    # 5 Compute next hidden state
+    next_h = o * np.tanh(next_c)
+
+    # Get the cache for the backward pass
+    cache = i, f, o, g, a, ai, af, ao, ag, Wx, Wh, b, prev_h, prev_c, x, next_c, next_h
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -345,6 +381,37 @@ def lstm_step_backward(dnext_h, dnext_c, cache):
     # the output value from the nonlinearity.                                   #
     #############################################################################
     pass
+    # Backward pass
+
+    # unroll cache
+    i, f, o, g, a, ai, af, ao, ag, Wx, Wh, b, prev_h, prev_c, x, next_c, next_h = cache
+
+    # Backprop into step 5
+
+    do = np.tanh(next_c) * dnext_h
+    dnext_c += o * (1 - np.tanh(next_c)**2) * dnext_h
+
+    # Backprop into step 4
+    df = prev_c * dnext_c
+    dprev_c = f * dnext_c
+    di = g * dnext_c
+    dg = i * dnext_c
+
+    # Backprop into the gate 3
+    dag = (1 - np.tanh(ag)**2) * dg
+    dao = sigmoid(ao) * (1 - sigmoid(ao)) * do
+    daf = sigmoid(af) * (1 - sigmoid(af)) * df
+    dai = sigmoid(ai) * (1 - sigmoid(ai)) * di
+
+    # Backprop into 2
+    da = np.hstack((dai, daf, dao, dag))
+
+    # Backprop into 1
+    dx = np.dot(da, Wx.T)
+    dWx = np.dot(x.T, da)
+    dprev_h = np.dot(da, Wh.T)
+    dWh = np.dot(prev_h.T, da)
+    db = np.sum(da, axis=0)
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
