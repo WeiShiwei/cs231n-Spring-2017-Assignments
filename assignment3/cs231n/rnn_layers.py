@@ -447,6 +447,41 @@ def lstm_forward(x, h0, Wx, Wh, b):
     # You should use the lstm_step_forward function that you just defined.      #
     #############################################################################
     pass
+    N,T,D = x.shape
+    H = Wh.shape[0]
+    h = np.zeros((N,T,H))
+    cache = []
+    
+    for t in range(T):
+        if t==0:
+            prev_h = h0
+            prev_c = np.zeros((N,H))
+        x_t = x[:,t,:]
+        next_h, next_c, cache_next = lstm_step_forward(x_t, prev_h, prev_c, Wx, Wh, b)
+        cache.append(cache_next)
+        h[:,t,:] = next_h
+        prev_h = next_h
+        prev_c = next_c
+
+    # N, T, D = x.shape
+    # N, H = h0.shape
+
+    # # some initialization
+    # prev_h = h0
+    # prev_c = np.zeros_like(prev_h)
+    # h = np.zeros((T, N, H))
+    # x = x.transpose(1, 0, 2)
+    # cache = []
+
+    # # run the loop on times
+    # for t in range(T):
+    #     if t > 0:
+    #         prev_h = h[t - 1]
+    #         prev_c = next_c
+    #     h[t], next_c, cache_next = lstm_step_forward(
+    #         x[t], prev_h, prev_c, Wx, Wh, b)
+    #     cache.append(cache_next)
+    # h = h.transpose(1, 0, 2)
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -475,6 +510,38 @@ def lstm_backward(dh, cache):
     # You should use the lstm_step_backward function that you just defined.     #
     #############################################################################
     pass
+    # Backprop into the lstm.
+
+    # Dimensions
+    N, T, H = dh.shape
+    i, f, o, g, a, ai, af, ao, ag, Wx, Wh, b, prev_h, prev_c, x, next_c, next_h = cache[
+        0]
+    D = x.shape[-1]
+
+    # Initialize dx,dh0,dWx,dWh,db
+    dx = np.zeros((T, N, D))
+    dh0 = np.zeros((N, H))
+    db = np.zeros((4 * H,))
+    dWh = np.zeros((H, 4 * H))
+    dWx = np.zeros((D, 4 * H))
+
+    # On transpose dh
+    dh = dh.transpose(1, 0, 2)
+    dh_prev = np.zeros((N, H))
+    dc_prev = np.zeros_like(dh_prev)
+
+    for t in reversed(range(T)):
+        dh_current = dh[t] + dh_prev
+        dc_current = dc_prev
+        dx_t, dh_prev, dc_prev, dWx_t, dWh_t, db_t = lstm_step_backward(
+            dh_current, dc_current, cache[t])
+        dx[t] += dx_t
+        dh0 = dh_prev
+        dWx += dWx_t
+        dWh += dWh_t
+        db += db_t
+
+    dx = dx.transpose(1, 0, 2)
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
